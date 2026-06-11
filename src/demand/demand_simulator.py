@@ -1,7 +1,6 @@
 import random
 
-def generate_demand():
-    return random.randint(50, 150)
-
-if __name__ == "__main__":
-    print(generate_demand())
+def generate_demand(price):
+    base_demand = 100
+    demand = max(0, base_demand - price + random.randint(-10, 10))
+    return demand
