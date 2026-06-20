@@ -43,6 +43,7 @@ from src.agents.dqn_agent import DQNAgent
 from src.agents.replay_buffer import ReplayBuffer
 from src.config.dqn_config import DQNConfig
 from src.environment.pricing_env import PricingEnvironment
+from src.utils.checkpointing import load_checkpoint, latest_checkpoint, save_checkpoint
 
 
 # ---------------------------------------------------------------------------
@@ -78,12 +79,21 @@ def ensure_checkpoint_dir(path: str) -> None:
 # Core training loop
 # ---------------------------------------------------------------------------
 
-def train(cfg: DQNConfig | None = None) -> None:
+def train(
+    cfg: DQNConfig | None = None,
+    resume_from: str | None = None,
+) -> None:
     """Run the full DQN training loop.
 
     Args:
         cfg (DQNConfig | None): Hyperparameter config. Defaults to DQNConfig()
                                 if not provided, using all default values.
+        resume_from (str | None): Path to a checkpoint ``.pt`` file produced
+                                  by ``save_checkpoint``. When supplied, the
+                                  agent's networks, optimiser, episode counter,
+                                  and epsilon are restored before training begins.
+                                  Pass ``"auto"`` to automatically resume from
+                                  the most recent checkpoint in cfg.checkpoint_dir.
     """
     if cfg is None:
         cfg = DQNConfig()
@@ -94,7 +104,22 @@ def train(cfg: DQNConfig | None = None) -> None:
     buffer = ReplayBuffer(capacity=cfg.buffer_capacity)
     ensure_checkpoint_dir(cfg.checkpoint_dir)
 
-    epsilon = cfg.epsilon_start   # exploration rate, annealed over training
+    epsilon      = cfg.epsilon_start   # exploration rate, annealed over training
+    start_episode = 1                  # may be overridden when resuming
+
+    # ── Optional: resume from a saved checkpoint ─────────────────────────
+    if resume_from is not None:
+        # Resolve "auto" → latest checkpoint file in the checkpoint directory
+        if resume_from == "auto":
+            resume_from = latest_checkpoint(cfg.checkpoint_dir)
+            if resume_from is None:
+                print("  [!] No checkpoints found in", cfg.checkpoint_dir, "— starting fresh.")
+
+        if resume_from is not None:
+            info         = load_checkpoint(agent, resume_from)
+            start_episode = info.get("episode", 0) + 1   # resume from next episode
+            epsilon       = info.get("epsilon", cfg.epsilon_start)
+            print(f"  [→] Resuming from episode {start_episode}  (ε={epsilon:.4f})")
 
     print("=" * 60)
     print("  DQN Dynamic Pricing — Training Started")
@@ -112,7 +137,7 @@ def train(cfg: DQNConfig | None = None) -> None:
 
     start_time = time.time()
 
-    for episode in range(1, cfg.max_episodes + 1):
+    for episode in range(start_episode, cfg.max_episodes + 1):
 
         # ── Reset ──────────────────────────────────────────────────────────
         state, _ = env.reset()
@@ -175,9 +200,12 @@ def train(cfg: DQNConfig | None = None) -> None:
 
         # ── Checkpoint ────────────────────────────────────────────────────
         if episode % cfg.save_every == 0:
-            ckpt_path = os.path.join(cfg.checkpoint_dir, f"dqn_ep{episode}.pt")
-            agent.save(ckpt_path)
-            print(f"  [✓] Checkpoint saved → {ckpt_path}")
+            save_checkpoint(
+                agent=agent,
+                episode=episode,
+                epsilon=epsilon,
+                cfg=cfg,
+            )
 
     # ── Training complete ─────────────────────────────────────────────────
     total_time = time.time() - start_time
@@ -189,10 +217,14 @@ def train(cfg: DQNConfig | None = None) -> None:
     print(f"  Final avg reward: {final_avg:.2f}  (last 50 episodes)")
     print("=" * 60)
 
-    # Save final model
-    final_path = os.path.join(cfg.checkpoint_dir, "dqn_final.pt")
-    agent.save(final_path)
-    print(f"  [✓] Final model saved → {final_path}")
+    # Save final model with full training-state metadata
+    save_checkpoint(
+        agent=agent,
+        episode=cfg.max_episodes,
+        epsilon=epsilon,
+        cfg=cfg,
+        filename="dqn_final.pt",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -200,9 +232,10 @@ def train(cfg: DQNConfig | None = None) -> None:
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    # Override any default hyperparameters here before calling train()
+    # Override any default hyperparameters here before calling train().
+    # To resume from the latest checkpoint, pass resume_from="auto".
     config = DQNConfig(
         max_episodes=500,          # quick smoke-test; increase for real training
         max_steps_per_episode=100,
     )
-    train(config)
+    train(config, resume_from=None)  # set resume_from="auto" to resume
