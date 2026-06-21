@@ -43,6 +43,7 @@ from src.agents.dqn_agent import DQNAgent
 from src.agents.replay_buffer import ReplayBuffer
 from src.config.dqn_config import DQNConfig
 from src.environment.pricing_env import PricingEnvironment
+from src.evaluation.metrics import TrainingMetrics
 from src.utils.checkpointing import load_checkpoint, latest_checkpoint, save_checkpoint
 
 
@@ -132,8 +133,8 @@ def train(
     print(f"  γ={cfg.gamma}  τ={cfg.tau}  lr={cfg.learning_rate}")
     print("=" * 60)
 
-    # Track training metrics for logging
-    episode_rewards = []
+    # Metrics tracker — owns all reward/loss/epsilon history and formatting
+    metrics = TrainingMetrics(window=50)
 
     start_time = time.time()
 
@@ -146,6 +147,7 @@ def train(
         episode_reward = 0.0
         episode_loss   = 0.0
         steps_trained  = 0
+        steps_taken    = 0   # total env steps this episode (for metrics)
 
         # ── Episode rollout ────────────────────────────────────────────────
         for step in range(cfg.max_steps_per_episode):
@@ -162,6 +164,7 @@ def train(
             buffer.push(state, action, reward, next_state, done)
 
             episode_reward += reward
+            steps_taken    += 1
             state = next_state
 
             # 4. Learn — only once the buffer has enough transitions
@@ -177,26 +180,23 @@ def train(
             if done:
                 break
 
-        # ── Post-episode bookkeeping ───────────────────────────────────────
-        epsilon = decay_epsilon(epsilon, cfg)
-        episode_rewards.append(episode_reward)
+        # ── Post-episode bookkeeping ───────────────────────────────────────────
+        epsilon  = decay_epsilon(epsilon, cfg)
+        avg_loss = episode_loss / steps_trained if steps_trained > 0 else 0.0
 
-        # Rolling average reward over last 50 episodes
-        avg_reward = np.mean(episode_rewards[-50:])
-        avg_loss   = episode_loss / steps_trained if steps_trained > 0 else 0.0
+        # Record all signals into the metrics tracker
+        metrics.record(
+            episode=episode,
+            reward=episode_reward,
+            loss=avg_loss,
+            epsilon=epsilon,
+            steps=steps_taken,
+            buffer_size=len(buffer),
+        )
 
-        # ── Logging (every 10 episodes) ────────────────────────────────────
+        # ── Logging (every 10 episodes) ─────────────────────────────────────
         if episode % 10 == 0 or episode == 1:
-            elapsed = time.time() - start_time
-            print(
-                f"  Ep {episode:>5}/{cfg.max_episodes}"
-                f"  |  reward={episode_reward:>8.2f}"
-                f"  |  avg50={avg_reward:>8.2f}"
-                f"  |  loss={avg_loss:.4f}"
-                f"  |  ε={epsilon:.3f}"
-                f"  |  buf={len(buffer):>6}"
-                f"  |  {elapsed:>6.1f}s"
-            )
+            metrics.print_progress(episode, cfg.max_episodes)
 
         # ── Checkpoint ────────────────────────────────────────────────────
         if episode % cfg.save_every == 0:
@@ -207,15 +207,8 @@ def train(
                 cfg=cfg,
             )
 
-    # ── Training complete ─────────────────────────────────────────────────
-    total_time = time.time() - start_time
-    final_avg  = np.mean(episode_rewards[-50:])
-
-    print("=" * 60)
-    print("  Training Complete")
-    print(f"  Total time      : {total_time:.1f}s")
-    print(f"  Final avg reward: {final_avg:.2f}  (last 50 episodes)")
-    print("=" * 60)
+    # ── Training complete ─────────────────────────────────────────────────────
+    metrics.print_summary()
 
     # Save final model with full training-state metadata
     save_checkpoint(
