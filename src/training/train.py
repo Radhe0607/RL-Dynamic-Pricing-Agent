@@ -44,6 +44,7 @@ from src.agents.replay_buffer import ReplayBuffer
 from src.config.dqn_config import DQNConfig
 from src.environment.pricing_env import PricingEnvironment
 from src.evaluation.metrics import TrainingMetrics
+from src.evaluation.report import generate_report
 from src.utils.checkpointing import load_checkpoint, latest_checkpoint, save_checkpoint
 
 
@@ -209,6 +210,9 @@ def train(
 
     # ── Training complete ─────────────────────────────────────────────────────
     metrics.print_summary()
+
+    # Save text report summarising this training run
+    generate_report(metrics, cfg)
 
     # Save final model with full training-state metadata
     save_checkpoint(
