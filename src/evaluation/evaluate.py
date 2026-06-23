@@ -19,6 +19,8 @@ Typical workflow
                  (or import run_evaluation and call it from a notebook)
     3. Visualize: plots are saved automatically when save_plots=True
                   (see src/evaluation/visualization.py for standalone use)
+    4. Compare:  python -m src.evaluation.comparison checkpoints/dqn_final.pt
+                 (runs DQN vs Fixed / Random / Rule-Based baselines)
 
 Usage
 -----
