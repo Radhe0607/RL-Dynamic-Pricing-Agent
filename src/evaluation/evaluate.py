@@ -21,6 +21,8 @@ Typical workflow
                   (see src/evaluation/visualization.py for standalone use)
     4. Compare:  python -m src.evaluation.comparison checkpoints/dqn_final.pt
                  (runs DQN vs Fixed / Random / Rule-Based baselines)
+    5. Env Viz:  python -m src.evaluation.env_visualization checkpoints/dqn_final.pt
+                 (price / demand / occupancy / revenue time-series per episode)
 
 Usage
 -----
@@ -40,6 +42,7 @@ import numpy as np
 from src.agents.dqn_agent import DQNAgent
 from src.config.dqn_config import DQNConfig
 from src.environment.pricing_env import PricingEnvironment
+from src.evaluation.env_visualization import visualize_environment
 from src.evaluation.visualization import plot_eval_rewards
 from src.utils.checkpointing import load_checkpoint
 
@@ -133,12 +136,15 @@ def run_evaluation(
     cfg: DQNConfig | None = None,
     save_plots: bool = False,
     plot_dir: str = "outputs/plots",
+    save_env_plots: bool = False,
+    env_plot_dir: str = "outputs/visualizations",
 ) -> dict:
     """Evaluate a trained DQN agent over multiple greedy episodes.
 
     Loads the checkpoint, runs ``n_episodes`` fully greedy rollouts
     (ε = 0, no exploration), and prints a formatted statistics report.
-    Optionally saves a reward bar-chart PNG via the visualization module.
+    Optionally saves a reward bar-chart PNG via the visualization module
+    and environment-state time-series plots via env_visualization.
 
     Args:
         checkpoint_path (str):          Path to a ``.pt`` checkpoint file
@@ -150,9 +156,14 @@ def run_evaluation(
         save_plots      (bool):         When ``True``, saves an evaluation
                                         reward bar-chart to *plot_dir*.
                                         Default is ``False``.
-        plot_dir        (str):          Directory where plot PNGs are written.
-                                        Created automatically if missing.
-                                        Default is ``"outputs/plots"``.
+        plot_dir        (str):          Directory where reward-plot PNGs are
+                                        written. Default is ``"outputs/plots"``.
+        save_env_plots  (bool):         When ``True``, saves environment-state
+                                        time-series plots (price, demand,
+                                        occupancy, revenue) to *env_plot_dir*.
+                                        Default is ``False``.
+        env_plot_dir    (str):          Directory for environment-state PNGs.
+                                        Default is ``"outputs/visualizations"``.
 
     Returns:
         dict: Evaluation results with keys:
@@ -202,6 +213,18 @@ def run_evaluation(
     # ── Optional: save evaluation reward plot ──────────────────────────────
     if save_plots:
         plot_eval_rewards(rewards, save_dir=plot_dir)
+
+    # ── Optional: save environment-state time-series plots ────────────────────
+    if save_env_plots:
+        visualize_environment(
+            strategy_or_agent=agent,
+            env=env,
+            n_episodes=n_episodes,
+            max_steps=cfg.max_steps_per_episode,
+            save_dir=env_plot_dir,
+            label="DQN Agent",
+            n_actions=cfg.action_size,
+        )
 
     return result
 
