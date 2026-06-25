@@ -23,6 +23,8 @@ Typical workflow
                  (runs DQN vs Fixed / Random / Rule-Based baselines)
     5. Env Viz:  python -m src.evaluation.env_visualization checkpoints/dqn_final.pt
                  (price / demand / occupancy / revenue time-series per episode)
+    6. Analytics: python -m src.evaluation.analytics checkpoints/dqn_final.pt
+                  (compute KPIs, print dashboard, export CSV + JSON)
 
 Usage
 -----
@@ -42,7 +44,8 @@ import numpy as np
 from src.agents.dqn_agent import DQNAgent
 from src.config.dqn_config import DQNConfig
 from src.environment.pricing_env import PricingEnvironment
-from src.evaluation.env_visualization import visualize_environment
+from src.evaluation.analytics import run_analytics
+from src.evaluation.env_visualization import collect_episode_data, visualize_environment
 from src.evaluation.visualization import plot_eval_rewards
 from src.utils.checkpointing import load_checkpoint
 
@@ -138,6 +141,8 @@ def run_evaluation(
     plot_dir: str = "outputs/plots",
     save_env_plots: bool = False,
     env_plot_dir: str = "outputs/visualizations",
+    save_analytics: bool = False,
+    analytics_dir: str = "outputs/analytics",
 ) -> dict:
     """Evaluate a trained DQN agent over multiple greedy episodes.
 
@@ -164,6 +169,12 @@ def run_evaluation(
                                         Default is ``False``.
         env_plot_dir    (str):          Directory for environment-state PNGs.
                                         Default is ``"outputs/visualizations"``.
+        save_analytics  (bool):         When ``True``, computes the performance
+                                        analytics dashboard and exports CSV +
+                                        JSON to *analytics_dir*.
+                                        Default is ``False``.
+        analytics_dir   (str):          Directory for analytics exports.
+                                        Default is ``"outputs/analytics"``.
 
     Returns:
         dict: Evaluation results with keys:
@@ -224,6 +235,23 @@ def run_evaluation(
             save_dir=env_plot_dir,
             label="DQN Agent",
             n_actions=cfg.action_size,
+        )
+
+    # ── Optional: compute and export analytics dashboard ────────────────────
+    if save_analytics:
+        # Re-use the existing env for data collection (avoids a second env)
+        ep_data = collect_episode_data(
+            strategy_or_agent=agent,
+            env=env,
+            max_steps=cfg.max_steps_per_episode,
+            n_episodes=n_episodes,
+            n_actions=cfg.action_size,
+        )
+        run_analytics(
+            episode_data=ep_data,
+            rewards=rewards,
+            label="DQN Agent",
+            output_dir=analytics_dir,
         )
 
     return result
