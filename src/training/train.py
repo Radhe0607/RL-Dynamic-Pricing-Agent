@@ -36,6 +36,7 @@ Usage
 
 import os
 import time
+import dataclasses
 
 import numpy as np
 
@@ -46,6 +47,7 @@ from src.environment.pricing_env import PricingEnvironment
 from src.evaluation.metrics import TrainingMetrics
 from src.evaluation.report import generate_report
 from src.utils.checkpointing import load_checkpoint, latest_checkpoint, save_checkpoint
+from src.utils.logger import TrainingLogger
 
 
 # ---------------------------------------------------------------------------
@@ -134,6 +136,12 @@ def train(
     print(f"  γ={cfg.gamma}  τ={cfg.tau}  lr={cfg.learning_rate}")
     print("=" * 60)
 
+    # ── Initialise logger ────────────────────────────────────────────────
+    logger = TrainingLogger()   # writes to outputs/logs/training.log
+    logger.log_config(dataclasses.asdict(cfg))
+    logger.info(f"  Training started  |  episodes={cfg.max_episodes}  "
+                f"lr={cfg.learning_rate}  γ={cfg.gamma}  τ={cfg.tau}")
+
     # Metrics tracker — owns all reward/loss/epsilon history and formatting
     metrics = TrainingMetrics(window=50)
 
@@ -149,6 +157,7 @@ def train(
         episode_loss   = 0.0
         steps_trained  = 0
         steps_taken    = 0   # total env steps this episode (for metrics)
+        ep_start_time  = time.time()  # wall-clock start of this episode
 
         # ── Episode rollout ────────────────────────────────────────────────
         for step in range(cfg.max_steps_per_episode):
@@ -199,17 +208,42 @@ def train(
         if episode % 10 == 0 or episode == 1:
             metrics.print_progress(episode, cfg.max_episodes)
 
+        # ── Structured file + console log (every episode) ──────────────────
+        ep_duration = time.time() - ep_start_time
+        logger.log_episode(
+            episode=episode,
+            max_episodes=cfg.max_episodes,
+            reward=episode_reward,
+            loss=avg_loss,
+            epsilon=epsilon,
+            steps=steps_taken,
+            buffer_size=len(buffer),
+            duration=ep_duration,
+        )
+
         # ── Checkpoint ────────────────────────────────────────────────────
         if episode % cfg.save_every == 0:
-            save_checkpoint(
+            ckpt_path = save_checkpoint(
                 agent=agent,
                 episode=episode,
                 epsilon=epsilon,
                 cfg=cfg,
             )
+            logger.log_checkpoint(ckpt_path)
 
     # ── Training complete ─────────────────────────────────────────────────────
     metrics.print_summary()
+
+    # Emit final log summary
+    history      = metrics.as_dict()
+    all_rewards  = history.get("episode_rewards", [])
+    logger.log_summary(
+        total_episodes=cfg.max_episodes,
+        mean_reward=float(sum(all_rewards) / max(len(all_rewards), 1)),
+        best_reward=float(max(all_rewards)) if all_rewards else 0.0,
+        final_epsilon=epsilon,
+        total_duration=time.time() - start_time,
+    )
 
     # Save text report summarising this training run
     generate_report(metrics, cfg)
