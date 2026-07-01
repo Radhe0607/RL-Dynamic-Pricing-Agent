@@ -16,6 +16,7 @@ This script ties together every component built so far:
   │    ReplayBuffer     │  ← fixed-capacity circular buffer, random sampling
   └─────────────────────┘
   Config read from DQNConfig (single source of truth for all hyperparameters).
+  External overrides are loaded from config/training_config.json when present.
 
 Training Loop (per episode)
 ---------------------------
@@ -29,12 +30,21 @@ Training Loop (per episode)
 3. Decay ε after the episode ends.
 4. Log episode stats; save checkpoint every N episodes.
 
+Configuration
+-------------
+  Priority order (highest wins):
+    1. DQNConfig keyword arguments passed to train() directly.
+    2. config/training_config.json  — loaded automatically when the file exists.
+    3. DQNConfig dataclass defaults.
+
 Usage
 -----
     python -m src.training.train
+    python -m src.training.train --config path/to/custom_config.json
 """
 
 import os
+import sys
 import time
 import dataclasses
 
@@ -42,6 +52,7 @@ import numpy as np
 
 from src.agents.dqn_agent import DQNAgent
 from src.agents.replay_buffer import ReplayBuffer
+from src.config.config_loader import ConfigFileError, ConfigValidationError, load_config
 from src.config.dqn_config import DQNConfig
 from src.environment.pricing_env import PricingEnvironment
 from src.evaluation.metrics import TrainingMetrics
@@ -262,11 +273,48 @@ def train(
 # Entry point
 # ---------------------------------------------------------------------------
 
+# Default path for the external JSON config (relative to project root)
+_DEFAULT_CONFIG_PATH = "config/training_config.json"
+
+
 if __name__ == "__main__":
-    # Override any default hyperparameters here before calling train().
-    # To resume from the latest checkpoint, pass resume_from="auto".
-    config = DQNConfig(
-        max_episodes=500,          # quick smoke-test; increase for real training
-        max_steps_per_episode=100,
-    )
-    train(config, resume_from=None)  # set resume_from="auto" to resume
+    # ── Parse optional --config CLI argument ────────────────────────────
+    # Usage:
+    #   python -m src.training.train
+    #   python -m src.training.train --config path/to/my_config.json
+    #   python -m src.training.train --resume
+
+    config_path = _DEFAULT_CONFIG_PATH
+    resume      = False
+
+    args = sys.argv[1:]
+    i    = 0
+    while i < len(args):
+        if args[i] == "--config" and i + 1 < len(args):
+            config_path = args[i + 1]
+            i += 2
+        elif args[i] == "--resume":
+            resume = True
+            i += 1
+        else:
+            i += 1
+
+    # ── Load config: external JSON → DQNConfig (falls back to defaults) ──
+    if os.path.isfile(config_path):
+        try:
+            config = load_config(config_path)
+        except ConfigFileError as exc:
+            print(f"\n  [ERROR] Config file error: {exc}")
+            sys.exit(1)
+        except ConfigValidationError as exc:
+            print(f"\n  [ERROR] Config validation failed: {exc}")
+            sys.exit(1)
+    else:
+        print(
+            f"  [config] No external config found at '{config_path}' "
+            f"— using DQNConfig defaults."
+        )
+        config = DQNConfig()
+
+    # ── Run training ───────────────────────────────────────────────
+    train(config, resume_from="auto" if resume else None)

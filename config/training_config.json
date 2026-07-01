@@ -1,0 +1,53 @@
+{
+  "_comment": "External training configuration for the DQN Dynamic Pricing Agent.",
+  "_comment_2": "Values here override DQNConfig dataclass defaults. Remove a key to use its default.",
+
+  "environment": {
+    "_comment": "Environment dimensions — must match PricingEnvironment.observation_space / action_space",
+    "state_size": 3,
+    "action_size": 5,
+    "max_steps_per_episode": 200
+  },
+
+  "training": {
+    "_comment": "High-level training loop settings",
+    "max_episodes": 1000,
+    "save_every": 100
+  },
+
+  "replay_buffer": {
+    "_comment": "Experience replay settings",
+    "buffer_capacity": 10000,
+    "batch_size": 64,
+    "min_buffer_size": 500
+  },
+
+  "network": {
+    "_comment": "Q-Network architecture",
+    "hidden_size": 64
+  },
+
+  "optimiser": {
+    "_comment": "Adam optimiser — learning_rate is the most sensitive hyperparameter",
+    "learning_rate": 0.001
+  },
+
+  "rl_core": {
+    "_comment": "Core RL hyperparameters",
+    "gamma": 0.99,
+    "tau": 0.005,
+    "target_update_freq": 100
+  },
+
+  "exploration": {
+    "_comment": "ε-greedy exploration schedule",
+    "epsilon_start": 1.0,
+    "epsilon_end": 0.05,
+    "epsilon_decay": 0.995
+  },
+
+  "checkpointing": {
+    "_comment": "Checkpoint output directory (relative to project root)",
+    "checkpoint_dir": "checkpoints"
+  }
+}
