@@ -3,6 +3,11 @@ dqn_agent.py
 ------------
 Deep Q-Network (DQN) agent for the Dynamic Pricing environment.
 
+All hyperparameters (learning rate, gamma, tau, hidden layer size, etc.)
+are supplied through ``DQNConfig`` — defined in ``src/config/dqn_config.py``
+and treated as the single source of truth for every tunable number.
+No magic numbers live in this file.
+
 Architecture
 ------------
 Two identical Q-networks are maintained:
@@ -27,6 +32,11 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
+
+# DQNConfig is the single source of truth for all DQN hyperparameters.
+# Import here so DQNAgent.from_config() can be used without the caller
+# having to unpack individual fields.
+from src.config.dqn_config import DQNConfig
 
 
 # ---------------------------------------------------------------------------
@@ -212,6 +222,42 @@ class DQNAgent:
             target_param.data.copy_(
                 self.tau * online_param.data + (1.0 - self.tau) * target_param.data
             )
+
+    # ------------------------------------------------------------------
+    # Config-driven constructor
+    # ------------------------------------------------------------------
+
+    @classmethod
+    def from_config(cls, cfg: DQNConfig) -> "DQNAgent":
+        """Construct a ``DQNAgent`` directly from a ``DQNConfig`` instance.
+
+        This is the preferred construction path in the training pipeline:
+        it guarantees that every hyperparameter comes from the central
+        config object and that no value is accidentally hardcoded at the
+        call site.
+
+        Args:
+            cfg (DQNConfig): Fully populated config object.
+
+        Returns:
+            DQNAgent: New agent instance configured according to *cfg*.
+
+        Example::
+
+            from src.config.dqn_config import DQNConfig
+            from src.agents.dqn_agent import DQNAgent
+
+            cfg   = DQNConfig(learning_rate=5e-4, gamma=0.95)
+            agent = DQNAgent.from_config(cfg)
+        """
+        return cls(
+            state_size=cfg.state_size,
+            action_size=cfg.action_size,
+            hidden_size=cfg.hidden_size,
+            learning_rate=cfg.learning_rate,
+            gamma=cfg.gamma,
+            tau=cfg.tau,
+        )
 
     # ------------------------------------------------------------------
     # Persistence helpers

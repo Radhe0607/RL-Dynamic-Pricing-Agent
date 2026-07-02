@@ -66,15 +66,19 @@ from src.utils.logger import TrainingLogger
 # ---------------------------------------------------------------------------
 
 def build_agent(cfg: DQNConfig) -> DQNAgent:
-    """Instantiate a DQNAgent from the given config."""
-    return DQNAgent(
-        state_size=cfg.state_size,
-        action_size=cfg.action_size,
-        hidden_size=cfg.hidden_size,
-        learning_rate=cfg.learning_rate,
-        gamma=cfg.gamma,
-        tau=cfg.tau,
-    )
+    """Instantiate a ``DQNAgent`` from the given config.
+
+    Delegates to ``DQNAgent.from_config()`` so all hyperparameters flow
+    from the single centralised ``DQNConfig`` object — no value is
+    repeated or hardcoded at the call site.
+
+    Args:
+        cfg (DQNConfig): Populated configuration object.
+
+    Returns:
+        DQNAgent: Ready-to-train agent.
+    """
+    return DQNAgent.from_config(cfg)
 
 
 def decay_epsilon(epsilon: float, cfg: DQNConfig) -> float:
