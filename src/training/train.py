@@ -57,6 +57,7 @@ from src.config.dqn_config import DQNConfig
 from src.environment.pricing_env import PricingEnvironment
 from src.evaluation.metrics import TrainingMetrics
 from src.evaluation.report import generate_report
+from src.training.progress_monitor import ProgressMonitor
 from src.utils.checkpointing import load_checkpoint, latest_checkpoint, save_checkpoint
 from src.utils.logger import TrainingLogger
 
@@ -160,6 +161,14 @@ def train(
     # Metrics tracker — owns all reward/loss/epsilon history and formatting
     metrics = TrainingMetrics(window=50)
 
+    # Progress monitor — display layer; reads from metrics, prints panels
+    monitor = ProgressMonitor(
+        total_episodes=cfg.max_episodes,
+        window=50,
+        print_every=10,
+    )
+    monitor.print_header(cfg)
+
     start_time = time.time()
 
     for episode in range(start_episode, cfg.max_episodes + 1):
@@ -219,9 +228,17 @@ def train(
             buffer_size=len(buffer),
         )
 
-        # ── Logging (every 10 episodes) ─────────────────────────────────────
+        # ── Progress monitor (every 10 episodes) ────────────────────────────
         if episode % 10 == 0 or episode == 1:
-            metrics.print_progress(episode, cfg.max_episodes)
+            monitor.update(
+                episode=episode,
+                reward=episode_reward,
+                avg_reward=metrics.moving_avg_reward(),
+                epsilon=epsilon,
+                loss=avg_loss,
+                steps=steps_taken,
+                buffer_size=len(buffer),
+            )
 
         # ── Structured file + console log (every episode) ──────────────────
         ep_duration = time.time() - ep_start_time
@@ -248,6 +265,8 @@ def train(
 
     # ── Training complete ─────────────────────────────────────────────────────
     metrics.print_summary()
+    total_duration = time.time() - start_time
+    monitor.print_footer(total_duration=total_duration)
 
     # Emit final log summary
     history      = metrics.as_dict()
