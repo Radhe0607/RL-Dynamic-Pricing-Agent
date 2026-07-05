@@ -56,6 +56,7 @@ from src.config.config_loader import ConfigFileError, ConfigValidationError, loa
 from src.config.dqn_config import DQNConfig
 from src.environment.pricing_env import PricingEnvironment
 from src.evaluation.metrics import TrainingMetrics
+from src.evaluation.performance_summary import generate_performance_summary
 from src.evaluation.report import generate_report
 from src.training.progress_monitor import ProgressMonitor
 from src.utils.checkpointing import load_checkpoint, latest_checkpoint, save_checkpoint
@@ -281,6 +282,13 @@ def train(
 
     # Save text report summarising this training run
     generate_report(metrics, cfg)
+
+    # Print and save the at-a-glance performance summary
+    generate_performance_summary(
+        metrics=metrics,
+        cfg=cfg,
+        total_duration=total_duration,
+    )
 
     # Save final model with full training-state metadata
     save_checkpoint(
