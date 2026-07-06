@@ -46,6 +46,7 @@ from src.config.dqn_config import DQNConfig
 from src.environment.pricing_env import PricingEnvironment
 from src.evaluation.analytics import run_analytics
 from src.evaluation.env_visualization import collect_episode_data, visualize_environment
+from src.evaluation.eval_summary_export import generate_eval_summary
 from src.evaluation.visualization import plot_eval_rewards
 from src.utils.checkpointing import load_checkpoint
 
@@ -143,6 +144,8 @@ def run_evaluation(
     env_plot_dir: str = "outputs/visualizations",
     save_analytics: bool = False,
     analytics_dir: str = "outputs/analytics",
+    save_eval_summary: bool = True,
+    eval_summary_dir: str = "outputs/reports",
 ) -> dict:
     """Evaluate a trained DQN agent over multiple greedy episodes.
 
@@ -152,29 +155,35 @@ def run_evaluation(
     and environment-state time-series plots via env_visualization.
 
     Args:
-        checkpoint_path (str):          Path to a ``.pt`` checkpoint file
-                                        produced by ``save_checkpoint``.
-        n_episodes      (int):          Number of evaluation episodes to run.
-                                        Default is 10.
-        cfg             (DQNConfig | None): Config used to construct the agent.
-                                        Defaults to ``DQNConfig()`` if omitted.
-        save_plots      (bool):         When ``True``, saves an evaluation
-                                        reward bar-chart to *plot_dir*.
-                                        Default is ``False``.
-        plot_dir        (str):          Directory where reward-plot PNGs are
-                                        written. Default is ``"outputs/plots"``.
-        save_env_plots  (bool):         When ``True``, saves environment-state
-                                        time-series plots (price, demand,
-                                        occupancy, revenue) to *env_plot_dir*.
-                                        Default is ``False``.
-        env_plot_dir    (str):          Directory for environment-state PNGs.
-                                        Default is ``"outputs/visualizations"``.
-        save_analytics  (bool):         When ``True``, computes the performance
-                                        analytics dashboard and exports CSV +
-                                        JSON to *analytics_dir*.
-                                        Default is ``False``.
-        analytics_dir   (str):          Directory for analytics exports.
-                                        Default is ``"outputs/analytics"``.
+        checkpoint_path  (str):           Path to a ``.pt`` checkpoint file
+                                          produced by ``save_checkpoint``.
+        n_episodes       (int):           Number of evaluation episodes to run.
+                                          Default is 10.
+        cfg              (DQNConfig | None): Config used to construct the agent.
+                                          Defaults to ``DQNConfig()`` if omitted.
+        save_plots       (bool):          When ``True``, saves an evaluation
+                                          reward bar-chart to *plot_dir*.
+                                          Default is ``False``.
+        plot_dir         (str):           Directory where reward-plot PNGs are
+                                          written. Default is ``"outputs/plots"``.
+        save_env_plots   (bool):          When ``True``, saves environment-state
+                                          time-series plots (price, demand,
+                                          occupancy, revenue) to *env_plot_dir*.
+                                          Default is ``False``.
+        env_plot_dir     (str):           Directory for environment-state PNGs.
+                                          Default is ``"outputs/visualizations"``.
+        save_analytics   (bool):          When ``True``, computes the performance
+                                          analytics dashboard and exports CSV +
+                                          JSON to *analytics_dir*.
+                                          Default is ``False``.
+        analytics_dir    (str):           Directory for analytics exports.
+                                          Default is ``"outputs/analytics"``.
+        save_eval_summary (bool):         When ``True`` (default), prints a
+                                          formatted evaluation summary panel to
+                                          the console and exports CSV + JSON to
+                                          *eval_summary_dir*.
+        eval_summary_dir (str):           Directory for evaluation summary files.
+                                          Default is ``"outputs/reports"``.
 
     Returns:
         dict: Evaluation results with keys:
@@ -252,6 +261,31 @@ def run_evaluation(
             rewards=rewards,
             label="DQN Agent",
             output_dir=analytics_dir,
+        )
+
+    # ── Optional: print and export evaluation summary (console + CSV + JSON) ──
+    if save_eval_summary:
+        # Build a KPI dict from the greedy-rollout results.
+        # Revenue and booking metrics use the same demand simulation that
+        # comparison.py and analytics.py use, so the numbers are comparable.
+        from src.evaluation.comparison import (
+            _run_strategy_episode,
+            _aggregate_kpis,
+            _DQNStrategyAdapter,
+        )
+        adapter       = _DQNStrategyAdapter(agent, n_actions=cfg.action_size)
+        ep_results    = [
+            _run_strategy_episode(adapter, env, cfg.max_steps_per_episode)
+            for _ in range(n_episodes)
+        ]
+        kpis          = _aggregate_kpis(ep_results, max_steps=cfg.max_steps_per_episode)
+        kpis["n_episodes"]  = n_episodes
+        kpis["total_steps"] = sum(r["steps"] for r in ep_results)
+        kpis["std_reward"]  = float(arr.std())
+        generate_eval_summary(
+            kpis=kpis,
+            label="DQN Agent",
+            output_dir=eval_summary_dir,
         )
 
     return result
