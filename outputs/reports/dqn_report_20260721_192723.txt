@@ -1,0 +1,72 @@
+================================================================
+  RL Dynamic Pricing — DQN Agent
+  Training Report
+================================================================
+  Generated : 2026-07-21 13:57:23 UTC
+  Checkpoint: checkpoints/
+
+----------------------------------------------------------------
+  RUN CONFIGURATION
+----------------------------------------------------------------
+  State size              : 3
+  Action size             : 5
+  Hidden layer size       : 64
+  Learning rate           : 0.001
+  Discount factor (γ)     : 0.99
+  Soft-update rate (τ)    : 0.005
+  Replay buffer capacity  : 10,000
+  Mini-batch size         : 64
+  Warm-up transitions     : 500
+  Max episodes            : 1,000
+  Max steps / episode     : 200
+  Checkpoint saved every  : 100 episodes
+
+----------------------------------------------------------------
+  TRAINING DURATION
+----------------------------------------------------------------
+  Total episodes trained  : 1,000
+  Total environment steps : 200,000
+  Wall-clock duration     : 34m 11s
+  Avg steps / episode     : 200.0
+
+----------------------------------------------------------------
+  REWARD STATISTICS
+----------------------------------------------------------------
+  Best episode reward     :     0.0000
+  Worst episode reward    :     0.0000
+  Final episode reward    :     0.0000
+  Mean reward             :     0.0000
+  Std deviation           :     0.0000
+  Median reward           :     0.0000
+  Best moving-avg reward  :     0.0000  (episode 1)
+
+----------------------------------------------------------------
+  LOSS STATISTICS  (TD / Bellman error)
+----------------------------------------------------------------
+  Mean training loss      :   0.001271
+  Final episode loss      :   0.000000
+  Episodes with zero loss : 0  (replay buffer warm-up)
+
+----------------------------------------------------------------
+  EXPLORATION (ε-greedy)
+----------------------------------------------------------------
+  Initial ε               : 0.9950
+  Final ε                 : 0.0500
+  ε decayed               : 100.0 %
+  ε minimum (cfg)         : 0.0500
+  ε decay rate (cfg)      : 0.995
+
+----------------------------------------------------------------
+  TOP 5 EPISODES BY REWARD
+----------------------------------------------------------------
+  Rank     Episode        Reward
+  ----     -------        ------
+  1              1        0.0000
+  2              2        0.0000
+  3              3        0.0000
+  4              4        0.0000
+  5              5        0.0000
+
+================================================================
+  End of Report
+================================================================
