@@ -1,0 +1,8 @@
+numpy>=1.24,<3
+torch>=2.2,<3
+gymnasium>=0.29,<2
+matplotlib>=3.7,<4
+pandas>=2,<3
+plotly>=5,<7
+streamlit>=1.30,<2
+PyYAML>=6,<7
