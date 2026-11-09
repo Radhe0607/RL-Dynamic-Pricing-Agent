@@ -47,8 +47,10 @@ import os
 import sys
 import time
 import dataclasses
+import random
 
 import numpy as np
+import torch
 
 from src.agents.dqn_agent import DQNAgent
 from src.agents.replay_buffer import ReplayBuffer
@@ -119,6 +121,12 @@ def train(
     if cfg is None:
         cfg = DQNConfig()
 
+    # Seed random sources before constructing the agent and environment.
+    # Fresh runs are repeatable on the same software and hardware stack.
+    random.seed(cfg.seed)
+    np.random.seed(cfg.seed)
+    torch.manual_seed(cfg.seed)
+
     # ── Initialise components ────────────────────────────────────────────
     env    = PricingEnvironment()
     agent  = build_agent(cfg)
@@ -175,7 +183,7 @@ def train(
     for episode in range(start_episode, cfg.max_episodes + 1):
 
         # ── Reset ──────────────────────────────────────────────────────────
-        state, _ = env.reset()
+        state, _ = env.reset(seed=cfg.seed if episode == start_episode else None)
         state = np.array(state, dtype=np.float32)
 
         episode_reward = 0.0
