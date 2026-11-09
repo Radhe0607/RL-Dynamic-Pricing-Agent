@@ -278,6 +278,8 @@ pip install -r requirements.txt
 python -m src.training.train
 ```
 
+Set `training.seed` in `config/training_config.json` (default `42`) to make fresh runs repeatable on the same software and hardware stack. Python, NumPy, PyTorch, and the environment are seeded. Checkpoint resume does not restore random-number-generator state.
+
 The training loop will:
 - Print a progress line every 10 episodes
 - Save checkpoints to `checkpoints/` every 100 episodes
