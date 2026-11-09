@@ -23,3 +23,7 @@ jobs:
       - run: python -m compileall -q app.py src
       - name: Run short training smoke
         run: python -c "from src.config.dqn_config import DQNConfig; from src.training.train import train; train(DQNConfig(max_episodes=1, max_steps_per_episode=5, buffer_capacity=32, batch_size=1, min_buffer_size=1, checkpoint_dir='/tmp/pricing-smoke-checkpoints', save_every=1))"
+      - name: Evaluate the committed checkpoint
+        run: python -c "from src.evaluation.evaluate import run_evaluation; run_evaluation('checkpoints/dqn_final.pt', n_episodes=1, eval_summary_dir='/tmp/pricing-eval-smoke')"
+      - name: Render dashboard smoke check
+        run: python -c "from streamlit.testing.v1 import AppTest; app = AppTest.from_file('app.py').run(); assert not app.exception, app.exception"
