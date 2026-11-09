@@ -11,6 +11,7 @@
 
   "training": {
     "_comment": "High-level training loop settings",
+    "seed": 42,
     "max_episodes": 1000,
     "save_every": 100
   },
