@@ -77,6 +77,9 @@ class DQNConfig:
         save_every:         Save a checkpoint every N episodes.
     """
 
+    # ── Reproducibility ─────────────────────────────────────────────────
+    seed: int = 42
+
     # ── Environment ────────────────────────────────────────────────────
     state_size: int = 3           # [price, inventory, demand] → 3 features
     action_size: int = 5          # 5 discrete price levels
@@ -113,6 +116,7 @@ class DQNConfig:
         assert 0.0 < self.epsilon_end < self.epsilon_start <= 1.0, (
             "epsilon values must satisfy: 0 < epsilon_end < epsilon_start <= 1"
         )
+        assert isinstance(self.seed, int) and 0 <= self.seed <= 2**32 - 1, "seed must be an integer from 0 to 2**32 - 1"
         assert self.min_buffer_size >= self.batch_size, (
             "min_buffer_size must be >= batch_size to enable the first sample"
         )
