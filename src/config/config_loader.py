@@ -145,7 +145,7 @@ class ConfigFileError(OSError):
 _SECTION_FIELDS: Dict[str, list] = {
     "environment":   ["state_size", "action_size",
                       "max_steps_per_episode"],
-    "training":      ["max_episodes", "save_every"],
+    "training":      ["max_episodes", "save_every", "seed"],
     "replay_buffer": ["buffer_capacity", "batch_size", "min_buffer_size"],
     "network":       ["hidden_size"],
     "optimiser":     ["learning_rate"],
@@ -295,6 +295,9 @@ def validate_config(flat: Dict[str, Any]) -> None:
                 "min_buffer_size", mbuf,
                 f"must be ≥ batch_size ({batch})"
             )
+
+    if "seed" in flat:
+        _check_positive_int("seed", flat["seed"], minimum=0)
 
     for key in ("hidden_size", "max_episodes", "max_steps_per_episode",
                 "target_update_freq", "save_every"):
