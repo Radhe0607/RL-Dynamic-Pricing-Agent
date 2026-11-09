@@ -262,6 +262,7 @@ source venv/bin/activate
 ### Step 3 — Install Dependencies
 
 ```bash
+pip install torch==2.14.1 --index-url https://download.pytorch.org/whl/cpu
 pip install -r requirements.txt
 ```
 
