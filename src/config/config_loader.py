@@ -297,7 +297,11 @@ def validate_config(flat: Dict[str, Any]) -> None:
             )
 
     if "seed" in flat:
-        _check_positive_int("seed", flat["seed"], minimum=0)
+        seed = _check_positive_int("seed", flat["seed"], minimum=0)
+        if seed > 2**32 - 1:
+            raise ConfigValidationError(
+                "seed", seed, "must be an integer from 0 to 2**32 - 1"
+            )
 
     for key in ("hidden_size", "max_episodes", "max_steps_per_episode",
                 "target_update_freq", "save_every"):
