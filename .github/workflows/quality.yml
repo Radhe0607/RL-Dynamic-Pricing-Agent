@@ -20,3 +20,5 @@ jobs:
           cache: pip
       - run: python -m pip install -r requirements.txt
       - run: python -m compileall -q app.py src
+      - name: Run short training smoke
+        run: python -c "from src.config.dqn_config import DQNConfig; from src.training.train import train; train(DQNConfig(max_episodes=1, max_steps_per_episode=5, buffer_capacity=32, batch_size=1, min_buffer_size=1, checkpoint_dir='/tmp/pricing-smoke-checkpoints', save_every=1))"
