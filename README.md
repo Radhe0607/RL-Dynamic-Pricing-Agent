@@ -12,7 +12,7 @@
 
 <br/>
 
-> **An end-to-end Deep Q-Network (DQN) agent that learns to set optimal room prices by maximising long-term revenue, outperforming fixed, random, and rule-based pricing strategies.**
+> **A runnable DQN experiment for a simplified hotel-pricing simulation, with training, checkpointing, evaluation, and baseline comparison utilities.**
 
 </div>
 
@@ -44,9 +44,9 @@
 
 ## 🔍 Project Overview
 
-The **RL Dynamic Pricing Agent** applies Deep Reinforcement Learning to the revenue management problem faced by hotels, airlines, and other capacity-constrained businesses. The agent observes the current price, remaining inventory, and remaining time, then selects a pricing action to maximise cumulative revenue across a booking horizon.
+The **RL Dynamic Pricing Agent** explores a revenue-management problem through a simplified hotel-style simulation. The agent observes simulated state and chooses from discrete price levels to maximise simulated reward over a booking horizon. This environment is for experimentation; it does not represent live market demand, competitor behavior, or deployment constraints.
 
-This project builds a complete, production-structured pipeline — from environment simulation and DQN training, to model checkpointing, visualisation, analytics, and strategy benchmarking.
+The repository provides an experiment pipeline for a simulated environment. It has not been validated against live market or booking data, and the README makes no claim that the learned policy consistently beats the baselines.
 
 ---
 
