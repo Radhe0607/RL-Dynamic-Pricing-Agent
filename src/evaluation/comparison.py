@@ -11,28 +11,19 @@ KPIs computed per strategy
 ---------------------------
   total_revenue     : Sum of (price × units_sold) across all episodes.
   total_bookings    : Total units sold (demand fulfilled) across all episodes.
-  occupancy_rate    : total_bookings / (episodes × max_steps) — fraction of
-                      available slots filled.
+  occupancy_rate    : total_bookings / (episodes × initial_inventory) —
+                      fraction of available inventory sold.
   avg_selling_price : Weighted mean price across all selling events.
   avg_reward        : Mean episode reward (directly from env.step).
   mean_reward       : Alias for avg_reward (included for interoperability).
   std_reward        : Standard deviation of episode rewards.
 
-How price and bookings are inferred
--------------------------------------
-The existing ``PricingEnvironment`` is a stub that returns constant
-state and zero reward, but its structure is fully compatible with
-the comparison runner.  The comparison module therefore **simulates
-economics itself** using the project's ``generate_demand`` function:
-
-    price    = strategy.action_to_price(action)
-    demand   = generate_demand(price)          # stochastic demand model
-    bookings = min(demand, remaining_inventory)
-    revenue  = bookings × price
-    reward   = revenue                          # proxy reward for baselines
-
-This makes baseline economics directly comparable to what a proper
-environment would produce once the environment stub is filled in.
+How comparison results are calculated
+--------------------------------------
+Each strategy is evaluated using the same PricingEnvironment.
+Bookings, realized price, revenue, and reward come from env.step(),
+so results respect the simulator's demand noise and inventory limit.
+Occupancy rate measures the share of each episode's initial inventory sold.
 
 Outputs
 --------
@@ -63,7 +54,6 @@ from __future__ import annotations
 import csv
 import json
 import os
-import random
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -76,7 +66,6 @@ from src.baselines.strategies import (
     RuleBasedPricingStrategy,
 )
 from src.config.dqn_config import DQNConfig
-from src.demand.demand_simulator import generate_demand
 from src.environment.pricing_env import PricingEnvironment
 
 
@@ -120,10 +109,8 @@ def _run_strategy_episode(
 ) -> Dict[str, float]:
     """Roll out one full episode for a given strategy and collect KPI signals.
 
-    The environment's ``step`` return is used for the primary reward signal.
-    In addition, pricing economics (revenue, bookings) are computed using the
-    project's ``generate_demand`` function so that all strategies produce
-    comparable business metrics even when the environment stub returns 0.
+    Reward and pricing KPIs are all taken from the same environment step,
+    keeping realized sales, inventory limits, revenue, and reward consistent.
 
     Args:
         strategy  (BaseStrategy):        The strategy to evaluate.
@@ -142,34 +129,19 @@ def _run_strategy_episode(
     total_reward   = 0.0
     total_revenue  = 0.0
     total_bookings = 0
-    prices_used:   List[float] = []
     steps          = 0
 
     for _ in range(max_steps):
         action = strategy.select_action(state)
 
-        # Convert action → price using the strategy's price-level table
-        price = strategy.action_to_price(action)
-
-        # Simulate demand at this price using the project's demand model
-        demand   = generate_demand(price)
-        bookings = max(0, demand)  # in a full env, capped by inventory
-
-        # Revenue = units sold × price
-        revenue = bookings * price
-
-        # Step the environment (uses env's own reward; stub returns 0)
-        next_state, env_reward, terminated, truncated, _ = env.step(action)
-
-        # For baselines: use simulated revenue as the reward proxy
-        # For DQN agent: env_reward is used once the environment is complete;
-        # for now all strategies use the same simulated revenue for fair comparison
-        step_reward = revenue  # consistent across all strategies
+        # Use the environment's realized economics for every strategy.
+        next_state, step_reward, terminated, truncated, info = env.step(action)
+        bookings = int(info["units_sold"])
+        revenue = float(info["revenue"])
 
         total_reward   += step_reward
         total_revenue  += revenue
         total_bookings += bookings
-        prices_used.append(price)
 
         steps += 1
         state  = np.array(next_state, dtype=np.float32)
@@ -182,7 +154,6 @@ def _run_strategy_episode(
         "total_revenue":  total_revenue,
         "total_bookings": total_bookings,
         "steps":          steps,
-        "prices_used":    prices_used,
     }
 
 
@@ -192,14 +163,14 @@ def _run_strategy_episode(
 
 def _aggregate_kpis(
     episode_results: List[Dict[str, float]],
-    max_steps:       int,
+    inventory_per_episode: int,
 ) -> Dict[str, float]:
     """Aggregate per-episode signals into strategy-level KPIs.
 
     Args:
         episode_results (list[dict]): Output of ``_run_strategy_episode``
                                       for each episode.
-        max_steps       (int):        Max steps per episode (for occupancy).
+        inventory_per_episode (int): Initial units available in each episode.
 
     Returns:
         dict: Strategy-level KPIs with the following keys:
@@ -212,18 +183,11 @@ def _aggregate_kpis(
     rewards   = [r["total_reward"]   for r in episode_results]
     revenues  = [r["total_revenue"]  for r in episode_results]
     bookings  = [r["total_bookings"] for r in episode_results]
-    all_steps = [r["steps"]          for r in episode_results]
-
-    # Flatten all prices used across every episode for the weighted average
-    all_prices = []
-    for r in episode_results:
-        all_prices.extend(r["prices_used"])
-
     total_revenue   = sum(revenues)
     total_bookings  = sum(bookings)
-    total_slots     = n * max_steps        # denominator for occupancy
-    occupancy_rate  = total_bookings / max(total_slots, 1)
-    avg_sell_price  = float(np.mean(all_prices)) if all_prices else 0.0
+    total_capacity  = n * inventory_per_episode
+    occupancy_rate  = total_bookings / max(total_capacity, 1)
+    avg_sell_price  = total_revenue / total_bookings if total_bookings else 0.0
     avg_reward      = float(np.mean(rewards))
     std_reward      = float(np.std(rewards)) if n > 1 else 0.0
 
@@ -249,9 +213,8 @@ def compare_strategies(
 ) -> Dict[str, Dict[str, float]]:
     """Evaluate a list of strategies and return their KPIs.
 
-    All strategies are run on the *same* ``PricingEnvironment`` instance
-    so environmental variation comes only from within-episode stochasticity
-    (the demand simulator uses ``random.randint``).
+    All strategies use the same environment dynamics; demand noise is sampled
+    within each rollout according to the environment's seeded RNG.
 
     Args:
         strategies  (list[BaseStrategy]): Strategies to evaluate.
@@ -270,7 +233,7 @@ def compare_strategies(
             _run_strategy_episode(strategy, env, max_steps)
             for _ in range(n_episodes)
         ]
-        kpis = _aggregate_kpis(episode_data, max_steps)
+        kpis = _aggregate_kpis(episode_data, env.initial_inventory)
         results[strategy.name] = kpis
 
     return results

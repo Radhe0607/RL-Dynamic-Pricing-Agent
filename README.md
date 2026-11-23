@@ -465,7 +465,7 @@ All strategies share a common `BaseStrategy` interface (`select_action(state) �
 |---|---|
 | Total Revenue | Σ (price × units sold) across all episodes |
 | Total Bookings | Total units sold |
-| Occupancy Rate | Bookings ÷ (episodes × max\_steps) |
+| Occupancy Rate | Units sold ÷ (episodes × initial inventory) |
 | Avg Selling Price | Weighted mean price |
 | Avg Reward | Mean episode reward |
 
