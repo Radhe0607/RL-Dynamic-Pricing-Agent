@@ -266,8 +266,8 @@ def run_evaluation(
     # ── Optional: print and export evaluation summary (console + CSV + JSON) ──
     if save_eval_summary:
         # Build a KPI dict from the greedy-rollout results.
-        # Revenue and booking metrics use the same demand simulation that
-        # comparison.py and analytics.py use, so the numbers are comparable.
+        # Revenue and booking metrics use realized environment results
+        # and respect the episode inventory limit.
         from src.evaluation.comparison import (
             _run_strategy_episode,
             _aggregate_kpis,
@@ -278,7 +278,7 @@ def run_evaluation(
             _run_strategy_episode(adapter, env, cfg.max_steps_per_episode)
             for _ in range(n_episodes)
         ]
-        kpis          = _aggregate_kpis(ep_results, max_steps=cfg.max_steps_per_episode)
+        kpis          = _aggregate_kpis(ep_results, inventory_per_episode=env.initial_inventory)
         kpis["n_episodes"]  = n_episodes
         kpis["total_steps"] = sum(r["steps"] for r in ep_results)
         kpis["std_reward"]  = float(arr.std())
