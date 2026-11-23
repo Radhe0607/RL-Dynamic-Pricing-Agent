@@ -54,7 +54,6 @@ from __future__ import annotations
 import csv
 import json
 import os
-import random
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -130,7 +129,6 @@ def _run_strategy_episode(
     total_reward   = 0.0
     total_revenue  = 0.0
     total_bookings = 0
-    prices_used:   List[float] = []
     steps          = 0
 
     for _ in range(max_steps):
@@ -138,14 +136,12 @@ def _run_strategy_episode(
 
         # Use the environment's realized economics for every strategy.
         next_state, step_reward, terminated, truncated, info = env.step(action)
-        price = float(info["price"])
         bookings = int(info["units_sold"])
         revenue = float(info["revenue"])
 
         total_reward   += step_reward
         total_revenue  += revenue
         total_bookings += bookings
-        prices_used.append(price)
 
         steps += 1
         state  = np.array(next_state, dtype=np.float32)
@@ -158,7 +154,6 @@ def _run_strategy_episode(
         "total_revenue":  total_revenue,
         "total_bookings": total_bookings,
         "steps":          steps,
-        "prices_used":    prices_used,
     }
 
 
@@ -188,13 +183,6 @@ def _aggregate_kpis(
     rewards   = [r["total_reward"]   for r in episode_results]
     revenues  = [r["total_revenue"]  for r in episode_results]
     bookings  = [r["total_bookings"] for r in episode_results]
-    all_steps = [r["steps"]          for r in episode_results]
-
-    # Flatten all prices used across every episode for the weighted average
-    all_prices = []
-    for r in episode_results:
-        all_prices.extend(r["prices_used"])
-
     total_revenue   = sum(revenues)
     total_bookings  = sum(bookings)
     total_capacity  = n * inventory_per_episode
@@ -225,9 +213,8 @@ def compare_strategies(
 ) -> Dict[str, Dict[str, float]]:
     """Evaluate a list of strategies and return their KPIs.
 
-    All strategies are run on the *same* ``PricingEnvironment`` instance
-    so environmental variation comes only from within-episode stochasticity
-    (the demand simulator uses ``random.randint``).
+    All strategies use the same environment dynamics; demand noise is sampled
+    within each rollout according to the environment's seeded RNG.
 
     Args:
         strategies  (list[BaseStrategy]): Strategies to evaluate.
