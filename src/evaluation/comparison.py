@@ -106,6 +106,7 @@ def _run_strategy_episode(
     strategy:    BaseStrategy,
     env:         PricingEnvironment,
     max_steps:   int,
+    seed:        int | None = None,
 ) -> Dict[str, float]:
     """Roll out one full episode for a given strategy and collect KPI signals.
 
@@ -116,13 +117,14 @@ def _run_strategy_episode(
         strategy  (BaseStrategy):        The strategy to evaluate.
         env       (PricingEnvironment):  Gymnasium environment instance.
         max_steps (int):                 Hard cap on episode length.
+        seed      (int | None):            Optional environment seed.
 
     Returns:
         dict: Per-episode KPI signals:
               ``total_reward``, ``total_revenue``, ``total_bookings``,
               ``steps``, ``prices_used``.
     """
-    state, _ = env.reset()
+    state, _ = env.reset(seed=seed)
     state    = np.array(state, dtype=np.float32)
     strategy.reset()
 
@@ -210,6 +212,7 @@ def compare_strategies(
     strategies:  List[BaseStrategy],
     n_episodes:  int = 20,
     max_steps:   int = 200,
+    seed:        int = 42,
 ) -> Dict[str, Dict[str, float]]:
     """Evaluate a list of strategies and return their KPIs.
 
@@ -220,6 +223,7 @@ def compare_strategies(
         strategies  (list[BaseStrategy]): Strategies to evaluate.
         n_episodes  (int):                Episodes per strategy. Default 20.
         max_steps   (int):                Steps per episode.    Default 200.
+    seed        (int):                Base environment seed. Default 42.
 
     Returns:
         dict: ``{strategy_name: kpi_dict}`` — one entry per strategy.
@@ -230,8 +234,8 @@ def compare_strategies(
     for strategy in strategies:
         print(f"  [compare] Running '{strategy.name}' for {n_episodes} episodes …")
         episode_data = [
-            _run_strategy_episode(strategy, env, max_steps)
-            for _ in range(n_episodes)
+            _run_strategy_episode(strategy, env, max_steps, seed=seed + episode)
+            for episode in range(n_episodes)
         ]
         kpis = _aggregate_kpis(episode_data, env.initial_inventory)
         results[strategy.name] = kpis
@@ -274,6 +278,7 @@ def _save_json(
     n_episodes:    int,
     max_steps:     int,
     checkpoint:    Optional[str],
+    seed:          int,
 ) -> None:
     """Write the comparison results to a JSON file with metadata.
 
@@ -283,11 +288,13 @@ def _save_json(
         n_episodes (int):   Episodes run per strategy.
         max_steps  (int):   Steps per episode.
         checkpoint (str|None): Checkpoint path used for the DQN agent.
+        seed       (int):       Base environment seed used for each run.
     """
     payload = {
         "generated_at": datetime.now(tz=timezone.utc).isoformat(),
         "n_episodes":   n_episodes,
         "max_steps":    max_steps,
+        "seed":         seed,
         "dqn_checkpoint": checkpoint,
         "strategies":   results,
     }
@@ -338,6 +345,7 @@ def run_comparison(
     n_episodes:      int           = 20,
     cfg:             Optional[DQNConfig] = None,
     output_dir:      str           = "outputs",
+    seed:            int           = 42,
 ) -> Dict[str, Dict]:
     """Run baseline vs DQN comparison and save results to disk.
 
@@ -353,6 +361,8 @@ def run_comparison(
         output_dir      (str):        Root output directory.
                                       CSV and JSON are saved here.
                                       Default is ``"outputs"``.
+        seed            (int):        Base seed for repeated evaluation.
+                                      Default is 42.
 
     Returns:
         dict: ``{strategy_name: kpi_dict}`` for every strategy evaluated.
@@ -367,7 +377,7 @@ def run_comparison(
         FixedPriceStrategy(action=0, n_actions=cfg.action_size),  # lowest price
         FixedPriceStrategy(action=2, n_actions=cfg.action_size),  # mid price
         FixedPriceStrategy(action=4, n_actions=cfg.action_size),  # highest price
-        RandomPriceStrategy(n_actions=cfg.action_size, seed=42),
+        RandomPriceStrategy(n_actions=cfg.action_size, seed=seed),
         RuleBasedPricingStrategy(n_actions=cfg.action_size),
     ]
 
@@ -394,6 +404,7 @@ def run_comparison(
     print(f"  Strategies : {len(strategies)}")
     print(f"  Episodes   : {n_episodes}")
     print(f"  Max steps  : {cfg.max_steps_per_episode}")
+    print(f"  Seed       : {seed}")
     print("=" * 60)
 
     # ── Run all strategies ───────────────────────────────────────────────
@@ -401,6 +412,7 @@ def run_comparison(
         strategies=strategies,
         n_episodes=n_episodes,
         max_steps=cfg.max_steps_per_episode,
+        seed=seed,
     )
 
     # ── Print table ──────────────────────────────────────────────────────
@@ -411,7 +423,7 @@ def run_comparison(
     json_path = os.path.join(output_dir, "comparison_results.json")
 
     _save_csv(results, csv_path)
-    _save_json(results, json_path, n_episodes, cfg.max_steps_per_episode, checkpoint_path)
+    _save_json(results, json_path, n_episodes, cfg.max_steps_per_episode, checkpoint_path, seed)
 
     return results
 
@@ -423,8 +435,9 @@ def run_comparison(
 if __name__ == "__main__":
     import sys
 
-    # Usage: python -m src.evaluation.comparison [checkpoint_path] [n_episodes]
+    # Usage: python -m src.evaluation.comparison [checkpoint_path] [n_episodes] [seed]
     ckpt = sys.argv[1] if len(sys.argv) > 1 else None
     n    = int(sys.argv[2]) if len(sys.argv) > 2 else 20
+    seed = int(sys.argv[3]) if len(sys.argv) > 3 else 42
 
-    run_comparison(checkpoint_path=ckpt, n_episodes=n)
+    run_comparison(checkpoint_path=ckpt, n_episodes=n, seed=seed)
