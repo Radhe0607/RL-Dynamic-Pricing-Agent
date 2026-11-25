@@ -59,6 +59,7 @@ def _run_greedy_episode(
     agent: DQNAgent,
     env: PricingEnvironment,
     max_steps: int,
+    seed: int | None = None,
 ) -> tuple[float, int]:
     """Roll out one episode with a fully greedy policy (ε = 0).
 
@@ -66,11 +67,12 @@ def _run_greedy_episode(
         agent     (DQNAgent):          The loaded, trained agent.
         env       (PricingEnvironment): Environment instance.
         max_steps (int):               Hard cap on episode length.
+        seed      (int | None):        Optional environment seed.
 
     Returns:
         tuple[float, int]: (total_reward, steps_taken)
     """
-    state, _ = env.reset()
+    state, _ = env.reset(seed=seed)
     state = np.array(state, dtype=np.float32)
 
     total_reward = 0.0
@@ -146,6 +148,7 @@ def run_evaluation(
     analytics_dir: str = "outputs/analytics",
     save_eval_summary: bool = True,
     eval_summary_dir: str = "outputs/reports",
+    seed: int = 42,
 ) -> dict:
     """Evaluate a trained DQN agent over multiple greedy episodes.
 
@@ -184,6 +187,8 @@ def run_evaluation(
                                           *eval_summary_dir*.
         eval_summary_dir (str):           Directory for evaluation summary files.
                                           Default is ``"outputs/reports"``.
+        seed             (int):           Base seed; each episode uses the next
+                                          integer. Default is 42.
 
     Returns:
         dict: Evaluation results with keys:
@@ -215,6 +220,7 @@ def run_evaluation(
             agent,
             env,
             max_steps=cfg.max_steps_per_episode,
+            seed=seed + ep,
         )
         rewards.append(ep_reward)
         steps.append(ep_steps)
@@ -228,6 +234,7 @@ def run_evaluation(
         "steps":       steps,
         "mean_reward": float(arr.mean()),
         "std_reward":  float(arr.std()),
+        "seed":        seed,
     }
 
     # ── Optional: save evaluation reward plot ──────────────────────────────
@@ -275,11 +282,17 @@ def run_evaluation(
         )
         adapter       = _DQNStrategyAdapter(agent, n_actions=cfg.action_size)
         ep_results    = [
-            _run_strategy_episode(adapter, env, cfg.max_steps_per_episode)
-            for _ in range(n_episodes)
+            _run_strategy_episode(
+                adapter,
+                env,
+                cfg.max_steps_per_episode,
+                seed=seed + episode,
+            )
+            for episode in range(n_episodes)
         ]
         kpis          = _aggregate_kpis(ep_results, inventory_per_episode=env.initial_inventory)
         kpis["n_episodes"]  = n_episodes
+        kpis["seed"]         = seed
         kpis["total_steps"] = sum(r["steps"] for r in ep_results)
         kpis["std_reward"]  = float(arr.std())
         generate_eval_summary(
@@ -301,4 +314,6 @@ if __name__ == "__main__":
     # Allow passing a checkpoint path as a CLI argument:
     #   python -m src.evaluation.evaluate checkpoints/dqn_final.pt
     ckpt = sys.argv[1] if len(sys.argv) > 1 else "checkpoints/dqn_final.pt"
-    run_evaluation(checkpoint_path=ckpt, n_episodes=10)
+    n_episodes = int(sys.argv[2]) if len(sys.argv) > 2 else 10
+    seed = int(sys.argv[3]) if len(sys.argv) > 3 else 42
+    run_evaluation(checkpoint_path=ckpt, n_episodes=n_episodes, seed=seed)

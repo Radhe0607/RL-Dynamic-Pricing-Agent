@@ -299,6 +299,7 @@ from src.evaluation.evaluate import run_evaluation
 run_evaluation(
     checkpoint_path="checkpoints/dqn_final.pt",
     n_episodes=20,
+    seed=42,                  # repeatable simulator demand
     save_plots=True,           # outputs/plots/
     save_env_plots=True,       # outputs/visualizations/
     save_analytics=True,       # outputs/analytics/
@@ -308,8 +309,10 @@ run_evaluation(
 ### 3. Compare DQN Against Baselines
 
 ```bash
-python -m src.evaluation.comparison checkpoints/dqn_final.pt 20
+python -m src.evaluation.comparison checkpoints/dqn_final.pt 20 42
 ```
+
+Evaluation and comparison default to seed `42`. Pass another seed to replay a different deterministic sequence of simulated demand episodes.
 
 ### 4. Generate Environment Visualisations Only
 
