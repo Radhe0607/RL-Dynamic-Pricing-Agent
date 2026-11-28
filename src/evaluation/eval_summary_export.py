@@ -33,6 +33,7 @@ Additional metadata included in exports
   n_episodes          : Number of evaluation episodes.
   total_steps         : Total environment steps across all episodes.
   std_reward          : Std deviation of episode rewards.
+  seed                : Base environment seed used for the evaluation run.
 
 Outputs (saved to outputs/reports/ by default)
 -----------------------------------------------
@@ -172,6 +173,7 @@ def build_eval_summary(
         "std_reward":          round(float(kpis.get("std_reward",          0.0)), 4),
         "n_episodes":          int(kpis.get("n_episodes",    0)),
         "total_steps":         int(kpis.get("total_steps",   0)),
+        "seed":                int(kpis["seed"]) if kpis.get("seed") is not None else None,
         # ── Metadata ──────────────────────────────────────────────────
         "label":               label,
         "generated_at":        datetime.now(tz=timezone.utc).isoformat(),

@@ -312,7 +312,7 @@ run_evaluation(
 python -m src.evaluation.comparison checkpoints/dqn_final.pt 20 42
 ```
 
-Evaluation and comparison default to seed `42`. Pass another seed to replay a different deterministic sequence of simulated demand episodes.
+Evaluation and comparison default to seed `42`. Pass another seed to replay a different deterministic sequence of simulated demand episodes. Evaluation summary JSON and CSV exports include the base seed so results remain traceable; older callers that omit the field export it as empty/null.
 
 ### 4. Generate Environment Visualisations Only
 
